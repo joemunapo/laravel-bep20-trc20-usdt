@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Http\Utils\BscUtil;
 use Illuminate\Console\Command;
-use App\Models\Bsc;
 use App\Models\UsdtPayment;
 
 class MoveBep20Funds extends Command
@@ -14,31 +14,31 @@ class MoveBep20Funds extends Command
     public function handle()
     {
         $this->info('Moving funds to main wallet...');
-        
+
         try {
             $successfulPayments = UsdtPayment::where('status', 'success')
-                                            ->where('funds_moved', false)
-                                            ->get();
-                                            
+                ->where('funds_moved', false)
+                ->get();
+
             if ($successfulPayments->isEmpty()) {
                 $this->info('No new successful payments to process.');
                 return Command::SUCCESS;
             }
-            
-            $bsc = new Bsc();
-            
+
+            $bsc = new BscUtil();
+
             foreach ($successfulPayments as $payment) {
                 $this->info("Processing payment #" . $payment->id . " for address " . $payment->address);
-                
+
                 $balance = $bsc->checkUsdtBalance($payment->address);
-                
+
                 if (floatval($balance) > 0) {
                     $this->info("Moving " . $balance . " USDT to main wallet");
-                    
+
                     try {
                         // Use gas-sponsored transfer to move funds
                         $result = $bsc->transferUsdtWithSponsoredGas($payment->address_index);
-                        
+
                         if ($result) {
                             $this->info("Successfully initiated transfer to main wallet");
                             // Mark as moved immediately
@@ -57,7 +57,7 @@ class MoveBep20Funds extends Command
                     $payment->save();
                 }
             }
-            
+
             $this->info('Finished moving funds.');
             return Command::SUCCESS;
         } catch (\Exception $e) {

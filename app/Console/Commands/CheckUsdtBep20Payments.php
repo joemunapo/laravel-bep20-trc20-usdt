@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Http\Utils\BscUtil;
 use Illuminate\Console\Command;
-use App\Models\Bsc;
 use App\Models\UsdtPayment;
 use Illuminate\Support\Facades\Log;
 
@@ -21,20 +21,20 @@ class CheckUsdtBep20Payments extends Command
     public function handle()
     {
         $this->info('Checking for USDT payments...');
-        
+
         try {
             $pendingPayments = UsdtPayment::where('status', 'pending')->get();
             foreach ($pendingPayments as $payment) {
                 $this->info("Checking payment #" . $payment->id);
-                
+
                 // Check if payment address has received the USDT
-                $bsc = new Bsc();
+                $bsc = new BscUtil();
                 $balance = $bsc->checkUsdtBalance($payment->address);
-                
+
                 // Convert to numeric value for comparison
                 $balanceValue = floatval($balance);
                 $requiredAmount = floatval($payment->amount);
-                
+
                 if ($balanceValue >= $requiredAmount) {
                     $this->info("Payment #" . $payment->id . " has been received! Amount: " . $balance);
                     $payment->status = 'success';
@@ -42,7 +42,7 @@ class CheckUsdtBep20Payments extends Command
                     $payment->save();
                 } else {
                     $this->info("Payment #" . $payment->id . " still pending. Current balance: " . $balance);
-                    
+
                     // Check if payment has expired
                     $expiryTime = $payment->created_at->addMinutes(30); // 30 minutes expiry
                     if (now() > $expiryTime) {
@@ -52,7 +52,7 @@ class CheckUsdtBep20Payments extends Command
                     }
                 }
             }
-            
+
             $this->info('Finished checking payments.');
             return Command::SUCCESS;
         } catch (\Exception $e) {

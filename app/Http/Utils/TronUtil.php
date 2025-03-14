@@ -5,7 +5,6 @@ namespace App\Http\Utils;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Key\PublicKeyInterface;
 use BitWasp\Bitcoin\Key\Deterministic\HierarchicalKeyFactory;
 use BitWasp\Bitcoin\Mnemonic\Bip39\Bip39SeedGenerator;
-use BitWasp\Bitcoin\Mnemonic\MnemonicFactory;
 use Elliptic\EC;
 use Illuminate\Support\Facades\Http;
 use kornrunner\Keccak;
@@ -26,7 +25,6 @@ class TronUtil
 
     public function generateAddressFromMnemonic($index = 0)
     {
-        $bip39 = MnemonicFactory::bip39();
         $seedGenerator = new Bip39SeedGenerator();
         $seed = $seedGenerator->getSeed($this->mnemonic);
 
@@ -34,7 +32,7 @@ class TronUtil
         $master = $hdFactory->fromEntropy($seed);
 
         // BIP44 derivation path for TRON: m/44'/195'/0'/0/index
-        $path = "44'/195'/0'/0/" . $index;
+        $path = "44'/195'/0'/0/{$index}";
         $key = $master->derivePath($path);
 
         $publicKey = $key->getPublicKey();
@@ -65,7 +63,7 @@ class TronUtil
         $y = $pubPoint->getY()->toString(16, 64);
 
         // Use X and Y to get the full public key
-        $fullPubKey = '04' . $x . $y;
+        $fullPubKey = "04{$x}{$y}";
 
         // Get keccak hash
         $hash = Keccak::hash(hex2bin(substr($fullPubKey, 2)), 256);
@@ -74,7 +72,7 @@ class TronUtil
         $address = substr($hash, 24);
 
         // Add 41 (TRON address prefix) and convert to base58
-        $addressHex = '41' . $address;
+        $addressHex = "41{$address}";
         $addressBin = hex2bin($addressHex);
         $base58Address = $this->base58EncodeCheck($addressBin);
 
@@ -196,8 +194,8 @@ class TronUtil
 
         // Create contract call data for TRC20 transfer()
         // Function signature: transfer(address _to, uint256 _value)
-        $methodSignature = 'transfer(address,uint256)';
-        $methodSignatureHash = substr(hash('sha256', $methodSignature), 0, 8);
+        // $methodSignature = 'transfer(address,uint256)';
+        // $methodSignatureHash = substr(hash('sha256', $methodSignature), 0, 8);
 
         // Parameter 1: address _to (padded to 32 bytes)
         $paramTo = str_pad(substr($toAddressHex, 2), 64, '0', STR_PAD_LEFT);
@@ -206,7 +204,7 @@ class TronUtil
         $paramValue = str_pad(dechex($amountInSun), 64, '0', STR_PAD_LEFT);
 
         // Combine method ID and parameters
-        $data = $methodSignatureHash . $paramTo . $paramValue;
+        // $data = $methodSignatureHash . $paramTo . $paramValue;
 
         // Create the contract call transaction
         $contractCallData = [
@@ -278,7 +276,7 @@ class TronUtil
         $address = substr($hash, 24);
 
         // Add 41 prefix (TRON address prefix) and convert to base58
-        $addressHex = '41' . $address;
+        $addressHex = "41{$address}";
         $addressBin = hex2bin($addressHex);
         $base58Address = $this->base58EncodeCheck($addressBin);
 
@@ -302,7 +300,7 @@ class TronUtil
         // Convert to hex
         $hex = bin2hex($withoutChecksum);
 
-        return '0x' . $hex;
+        return "0x{$hex}";
     }
 
     /**
@@ -358,6 +356,8 @@ class TronUtil
 
         // Convert transaction to JSON
         $txID = $transaction['txID'];
+        logger("Sig", compact('txID'));
+
         $rawDataHex = $transaction['raw_data_hex'];
 
         // Create signature
@@ -425,18 +425,18 @@ class TronUtil
 
             // Handle failed responses
             return [
-                'error' => 'API request failed with status ' . $response->status(),
+                'error' => "API request failed with status {$response->status()}",
                 'response' => $response->json() ?: $response->body()
             ];
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             // Handle connection errors
             return [
-                'error' => 'Connection error: ' . $e->getMessage()
+                'error' => "Connection error: {$e->getMessage()}"
             ];
         } catch (\Exception $e) {
             // Handle general exceptions
             return [
-                'error' => 'Error: ' . $e->getMessage()
+                'error' => "Error: {$e->getMessage()}"
             ];
         }
     }
